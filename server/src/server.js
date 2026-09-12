@@ -1,6 +1,6 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
 
 const pool = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
@@ -8,9 +8,9 @@ const customerRoutes = require("./routes/customerRoutes");
 const agentRoutes = require("./routes/agentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const slaRoutes = require("./routes/slaRoutes");
-const notificationRoutes =
-  require("./routes/notificationRoutes");
-  
+const notificationRoutes = require("./routes/notificationRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
+
 const app = express();
 
 app.use(cors());
@@ -51,7 +51,10 @@ app.use(
   "/api/notifications",
   notificationRoutes
 );
-
+app.use(
+  "/api/customer",
+  reviewRoutes
+);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

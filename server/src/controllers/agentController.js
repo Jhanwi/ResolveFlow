@@ -1,7 +1,14 @@
 const pool = require("../config/db");
+
 const {
   createNotification
 } = require("../services/notificationService");
+
+const {
+  sendAgentReplyEmail,
+  sendTicketResolvedEmail,
+  sendTicketEscalatedEmail
+} = require("../services/emailService");
 
 const getAgentTickets = async (req, res) => {
   try {
@@ -19,7 +26,8 @@ const getAgentTickets = async (req, res) => {
         u.name AS customer_name,
         u.email AS customer_email
        FROM tickets t
-       JOIN users u ON t.customer_id = u.id
+       JOIN users u
+         ON t.customer_id = u.id
        WHERE t.assigned_agent_id = $1
        ORDER BY t.created_at DESC`,
       [req.user.id]
@@ -64,9 +72,7 @@ const getAgentTicketDetails = async (req, res) => {
 
     const ticket = ticketResult.rows[0];
 
-    if (
-      ticket.assigned_agent_id !== req.user.id
-    ) {
+    if (ticket.assigned_agent_id !== req.user.id) {
       return res.status(403).json({
         message: "This ticket is not assigned to you"
       });
@@ -113,14 +119,14 @@ const replyToTicket = async (req, res) => {
     }
 
     const ticketResult = await pool.query(
-     `SELECT
-      id,
-      status,
-      customer_id,
-      subject
-      FROM tickets
-      WHERE id = $1
-      AND assigned_agent_id = $3`,
+      `SELECT
+        id,
+        status,
+        customer_id,
+        subject
+       FROM tickets
+       WHERE id = $1
+       AND assigned_agent_id = $2`,
       [id, req.user.id]
     );
 
@@ -129,6 +135,8 @@ const replyToTicket = async (req, res) => {
         message: "Ticket not found or not assigned to you"
       });
     }
+
+    const ticket = ticketResult.rows[0];
 
     const result = await pool.query(
       `INSERT INTO ticket_messages
@@ -151,10 +159,24 @@ const replyToTicket = async (req, res) => {
     );
 
     await createNotification(
-     ticketResult.rows[0].customer_id,
-     `Agent replied to ticket #${id}: ${ticketResult.rows[0].subject}`,
-     Number(id)
+      ticket.customer_id,
+      `Agent replied to ticket #${id}: ${ticket.subject}`,
+      Number(id)
     );
+
+    const customerResult = await pool.query(
+      `SELECT email
+       FROM users
+       WHERE id = $1`,
+      [ticket.customer_id]
+    );
+
+    if (customerResult.rows.length > 0) {
+      await sendAgentReplyEmail(
+        customerResult.rows[0].email,
+        ticket
+      );
+    }
 
     res.status(201).json({
       message: "Reply added successfully",
@@ -258,17 +280,33 @@ const updateTicketStatus = async (req, res) => {
       });
     }
 
+    const ticket = result.rows[0];
+
     if (status === "resolved") {
       await createNotification(
-        result.rows[0].customer_id,
-       `Ticket #${id} has been resolved`,
-       Number(id)
-     );
+        ticket.customer_id,
+        `Ticket #${id} has been resolved`,
+        Number(id)
+      );
+
+      const customerResult = await pool.query(
+        `SELECT email
+         FROM users
+         WHERE id = $1`,
+        [ticket.customer_id]
+      );
+
+      if (customerResult.rows.length > 0) {
+        await sendTicketResolvedEmail(
+          customerResult.rows[0].email,
+          ticket
+        );
+      }
     }
 
     res.json({
       message: "Ticket status updated",
-      ticket: result.rows[0]
+      ticket
     });
   } catch (error) {
     console.error(error);
@@ -342,7 +380,11 @@ const assignTicket = async (req, res) => {
     }
 
     const agentResult = await pool.query(
-      `SELECT id, name, email, role
+      `SELECT
+        id,
+        name,
+        email,
+        role
        FROM users
        WHERE id = $1
        AND role = 'agent'`,
@@ -375,9 +417,9 @@ const assignTicket = async (req, res) => {
     }
 
     await createNotification(
-     agentId,
-     `Ticket #${id} has been assigned to you`,
-     Number(id)
+      agentId,
+      `Ticket #${id} has been assigned to you`,
+      Number(id)
     );
 
     res.json({
@@ -417,16 +459,23 @@ const escalateTicket = async (req, res) => {
     }
 
     const adminsResult = await pool.query(
-     `SELECT id
-      FROM users
-      WHERE role = 'admin'`
+      `SELECT
+        id,
+        email
+       FROM users
+       WHERE role = 'admin'`
     );
 
     for (const admin of adminsResult.rows) {
-     await createNotification(
-       admin.id,
-       `Ticket #${id} has been escalated to critical priority`,
-       Number(id)
+      await createNotification(
+        admin.id,
+        `Ticket #${id} has been escalated to critical priority`,
+        Number(id)
+      );
+
+      await sendTicketEscalatedEmail(
+        admin.email,
+        result.rows[0]
       );
     }
 

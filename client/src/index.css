@@ -1088,3 +1088,83 @@ textarea {
   color: #6b7280;
   font-size: 11px;
 }
+
+/* Reviews */
+
+.review-card {
+  margin-top: 24px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.review-card h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-form p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.review-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.review-stars {
+  display: flex;
+  gap: 5px;
+}
+
+.star-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #d1d5db;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.star-button.active {
+  color: #f59e0b;
+}
+
+.star {
+  color: #d1d5db;
+  font-size: 28px;
+}
+
+.star.active {
+  color: #f59e0b;
+}
+
+.review-submitted {
+  padding-top: 8px;
+}
+
+.review-submitted p {
+  margin: 12px 0;
+}
+
+.review-submitted small {
+  color: #6b7280;
+}
+
+.form-message {
+  margin: 0;
+  font-size: 14px;
+}

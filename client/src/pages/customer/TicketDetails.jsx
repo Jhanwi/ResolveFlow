@@ -1,80 +1,112 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+
 import {
   getTicketDetails,
   addMessage
 } from "../../services/ticketService";
+
+import {
+  createReview,
+  getTicketReview
+} from "../../services/reviewService";
+
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import SlaTimer from "../../components/SlaTimer";
-import { useAuth } from "../../context/AuthContext";
 
 const TicketDetails = () => {
   const { id } = useParams();
-  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [ticket, setTicket] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState("");
 
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
 
-  const loadTicket = async () => {
-    try {
-      const result = await getTicketDetails(id);
-
-      setTicket(result.ticket);
-      setMessages(result.messages);
-    } catch (error) {
-      setError(
-        error.response?.data?.message ||
-        "Unable to load ticket"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [rating, setRating] = useState(0);
+  const [reviewComment, setReviewComment] =
+    useState("");
+  const [review, setReview] = useState(null);
+  const [reviewMessage, setReviewMessage] =
+    useState("");
 
   useEffect(() => {
     loadTicket();
   }, [id]);
 
-  const handleReply = async (e) => {
-    e.preventDefault();
+  const loadTicket = async () => {
+    try {
+      const data = await getTicketDetails(id);
+
+      setTicket(data.ticket);
+      setMessages(data.messages);
+
+      const reviewData =
+        await getTicketReview(id);
+
+      setReview(reviewData.review);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (event) => {
+    event.preventDefault();
 
     if (!message.trim()) {
       return;
     }
 
-    setSending(true);
-    setError("");
-
     try {
-      const result = await addMessage(
+      setSending(true);
+
+      await addMessage(
         id,
         message.trim()
       );
 
-      setMessages((current) => [
-        ...current,
-        {
-          ...result.reply,
-          sender_name: user.name,
-          sender_role: user.role
-        }
-      ]);
-
       setMessage("");
-      loadTicket();
+
+      await loadTicket();
     } catch (error) {
-      setError(
-        error.response?.data?.message ||
-        "Unable to send reply"
-      );
+      console.error(error);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleReviewSubmit = async (event) => {
+    event.preventDefault();
+
+    if (rating === 0) {
+      setReviewMessage(
+        "Please select a rating"
+      );
+
+      return;
+    }
+
+    try {
+      const data = await createReview(id, {
+        rating,
+        comment: reviewComment
+      });
+
+      setReview(data.review);
+
+      setReviewMessage(
+        "Thank you for your feedback!"
+      );
+    } catch (error) {
+      setReviewMessage(
+        error.response?.data?.message ||
+          "Unable to submit review"
+      );
     }
   };
 
@@ -89,8 +121,15 @@ const TicketDetails = () => {
   if (!ticket) {
     return (
       <div className="page">
-        <div className="error-message">
-          {error || "Ticket not found"}
+        <div className="empty-state">
+          <p>Ticket not found.</p>
+
+          <button
+            className="secondary-button"
+            onClick={() => navigate("/tickets")}
+          >
+            Back to My Tickets
+          </button>
         </div>
       </div>
     );
@@ -98,92 +137,213 @@ const TicketDetails = () => {
 
   return (
     <div className="page">
-      <div className="ticket-header">
+      <div className="page-header">
         <div>
-          <span className="ticket-id">
-            Ticket #{ticket.id}
-          </span>
+          <button
+            className="secondary-button"
+            onClick={() => navigate("/tickets")}
+          >
+            ← Back to My Tickets
+          </button>
 
-          <h1>{ticket.subject}</h1>
+          <h1>
+            Ticket #{ticket.id}
+          </h1>
 
           <p>
-            {ticket.category || "General Support"}
+            Created on{" "}
+            {new Date(
+              ticket.created_at
+            ).toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      <div className="ticket-header">
+        <div>
+          <h2>{ticket.subject}</h2>
+
+          <p>
+            {ticket.description}
           </p>
         </div>
 
-        <div className="ticket-status">
-          <PriorityBadge
-            priority={ticket.priority}
-          />
-
+        <div className="ticket-badges">
           <StatusBadge
             status={ticket.status}
+          />
+
+          <PriorityBadge
+            priority={ticket.priority}
           />
         </div>
       </div>
 
       <div className="sla-grid">
-        <SlaTimer
-          dueAt={ticket.response_due_at}
-          label="Response SLA"
-        />
+        <div className="sla-timer">
+          <span>
+            Response SLA
+          </span>
 
-        <SlaTimer
-          dueAt={ticket.resolution_due_at}
-          label="Resolution SLA"
-        />
+          <SlaTimer
+            dueAt={ticket.response_due_at}
+          />
+        </div>
+
+        <div className="sla-timer">
+          <span>
+            Resolution SLA
+          </span>
+
+          <SlaTimer
+            dueAt={
+              ticket.resolution_due_at
+            }
+          />
+        </div>
+      </div>
+
+      <div className="status-timeline">
+        <div
+          className={
+            ticket.status
+              ? "timeline-step active"
+              : "timeline-step"
+          }
+        >
+          <span>1</span>
+          <p>Created</p>
+        </div>
+
+        <div
+          className={
+            [
+              "assigned",
+              "in_progress",
+              "waiting_for_customer",
+              "resolved"
+            ].includes(ticket.status)
+              ? "timeline-step active"
+              : "timeline-step"
+          }
+        >
+          <span>2</span>
+          <p>Assigned</p>
+        </div>
+
+        <div
+          className={
+            [
+              "in_progress",
+              "waiting_for_customer",
+              "resolved"
+            ].includes(ticket.status)
+              ? "timeline-step active"
+              : "timeline-step"
+          }
+        >
+          <span>3</span>
+          <p>In Progress</p>
+        </div>
+
+        <div
+          className={
+            [
+              "waiting_for_customer",
+              "resolved"
+            ].includes(ticket.status)
+              ? "timeline-step active"
+              : "timeline-step"
+          }
+        >
+          <span>4</span>
+          <p>Waiting</p>
+        </div>
+
+        <div
+          className={
+            ticket.status === "resolved"
+              ? "timeline-step active"
+              : "timeline-step"
+          }
+        >
+          <span>5</span>
+          <p>Resolved</p>
+        </div>
       </div>
 
       <div className="conversation-card">
-        <div className="conversation-header">
-          <h2>Conversation</h2>
+        <div className="section-header">
+          <div>
+            <h2>Conversation</h2>
+
+            <p>
+              Communicate with the support team
+              about your issue.
+            </p>
+          </div>
         </div>
 
         <div className="messages">
-          {messages.map((item) => (
-            <div
-              className={`message ${
-                item.sender_id === user.id
-                  ? "customer-message"
-                  : "agent-message"
-              }`}
-              key={item.id}
-            >
-              <div className="message-top">
-                <strong>
-                  {item.sender_name}
-                </strong>
+          {messages.length === 0 ? (
+            <p>
+              No messages yet.
+            </p>
+          ) : (
+            messages.map((item) => (
+              <div
+                key={item.id}
+                className={`message ${
+                  item.sender_role === "customer"
+                    ? "customer-message"
+                    : "agent-message"
+                }`}
+              >
+                <div className="message-header">
+                  <strong>
+                    {item.sender_name}
+                  </strong>
 
-                <span>
-                  {new Date(
-                    item.created_at
-                  ).toLocaleString()}
-                </span>
+                  <small>
+                    {new Date(
+                      item.created_at
+                    ).toLocaleString()}
+                  </small>
+                </div>
+
+                <p>
+                  {item.message}
+                </p>
+
+                {item.attachment_url && (
+                  <a
+                    href={
+                      item.attachment_url
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View attachment
+                  </a>
+                )}
               </div>
-
-              <p>{item.message}</p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
-
-        {ticket.status !== "resolved" ? (
+        {ticket.status !== "resolved" && (
           <form
             className="reply-form"
-            onSubmit={handleReply}
+            onSubmit={handleSendMessage}
           >
             <textarea
               value={message}
-              onChange={(e) =>
-                setMessage(e.target.value)
+              onChange={(event) =>
+                setMessage(event.target.value)
               }
               placeholder="Write a reply..."
               rows="4"
+              disabled={sending}
             />
 
             <button
@@ -191,17 +351,120 @@ const TicketDetails = () => {
               className="primary-button"
               disabled={sending}
             >
-              {sending ? "Sending..." : "Send Reply"}
+              {sending
+                ? "Sending..."
+                : "Send Reply"}
             </button>
           </form>
-        ) : (
+        )}
+
+        {ticket.status === "resolved" && (
           <div className="resolved-message">
             This ticket has been resolved.
           </div>
         )}
       </div>
+
+      {ticket.status === "resolved" && (
+        <div className="review-card">
+          <h2>How did we do?</h2>
+
+          {review ? (
+            <div className="review-submitted">
+              <p>
+                Your rating
+              </p>
+
+              <div className="review-stars">
+                {[1, 2, 3, 4, 5].map(
+                  (star) => (
+                    <span
+                      key={star}
+                      className={
+                        star <= review.rating
+                          ? "star active"
+                          : "star"
+                      }
+                    >
+                      ★
+                    </span>
+                  )
+                )}
+              </div>
+
+              <p>
+                {review.comment ||
+                  "No written feedback provided."}
+              </p>
+
+              <small>
+                Review submitted on{" "}
+                {new Date(
+                  review.created_at
+                ).toLocaleDateString()}
+              </small>
+            </div>
+          ) : (
+            <form
+              className="review-form"
+              onSubmit={handleReviewSubmit}
+            >
+              <p>
+                Did this support interaction
+                solve your problem?
+              </p>
+
+              <div className="review-stars">
+                {[1, 2, 3, 4, 5].map(
+                  (star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      className={
+                        star <= rating
+                          ? "star-button active"
+                          : "star-button"
+                      }
+                      onClick={() =>
+                        setRating(star)
+                      }
+                    >
+                      ★
+                    </button>
+                  )
+                )}
+              </div>
+
+              <textarea
+                value={reviewComment}
+                onChange={(event) =>
+                  setReviewComment(
+                    event.target.value
+                  )
+                }
+                placeholder="Tell us about your experience..."
+                rows="4"
+              />
+
+              <button
+                type="submit"
+                className="primary-button"
+              >
+                Submit Review
+              </button>
+
+              {reviewMessage && (
+                <p className="form-message">
+                  {reviewMessage}
+                </p>
+              )}
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
 export default TicketDetails;
+

@@ -3,6 +3,9 @@ const { calculateSla } = require("../services/slaService");
 const {
   createNotification
 } = require("../services/notificationService");
+const {
+  sendNewTicketEmail
+} = require("../services/emailService");
 
 const createTicket = async (req, res) => {
   try {
@@ -65,7 +68,7 @@ const createTicket = async (req, res) => {
     );
 
     const agentsResult = await pool.query(
-     `SELECT id
+     `SELECT id, email
       FROM users
       WHERE role IN ('agent', 'admin')`
     );
@@ -77,6 +80,11 @@ const createTicket = async (req, res) => {
        ticket.id
       );
     }
+
+    await sendNewTicketEmail(
+      user.email,
+      ticket
+    );
 
     res.status(201).json({
       message: "Ticket created successfully",
