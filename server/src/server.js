@@ -8,7 +8,9 @@ const customerRoutes = require("./routes/customerRoutes");
 const agentRoutes = require("./routes/agentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const slaRoutes = require("./routes/slaRoutes");
-
+const notificationRoutes =
+  require("./routes/notificationRoutes");
+  
 const app = express();
 
 app.use(cors());
@@ -45,6 +47,10 @@ app.use("/api/customer", customerRoutes);
 app.use("/api/agent", agentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/sla", slaRoutes);
+app.use(
+  "/api/notifications",
+  notificationRoutes
+);
 
 const PORT = process.env.PORT || 5000;
 

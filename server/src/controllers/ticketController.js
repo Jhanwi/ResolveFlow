@@ -1,5 +1,8 @@
 const pool = require("../config/db");
 const { calculateSla } = require("../services/slaService");
+const {
+  createNotification
+} = require("../services/notificationService");
 
 const createTicket = async (req, res) => {
   try {
@@ -60,6 +63,20 @@ const createTicket = async (req, res) => {
         description
       ]
     );
+
+    const agentsResult = await pool.query(
+     `SELECT id
+      FROM users
+      WHERE role IN ('agent', 'admin')`
+    );
+
+    for (const user of agentsResult.rows) {
+     await createNotification(
+       user.id,
+       `New ticket #${ticket.id} was created: ${ticket.subject}`,
+       ticket.id
+      );
+    }
 
     res.status(201).json({
       message: "Ticket created successfully",

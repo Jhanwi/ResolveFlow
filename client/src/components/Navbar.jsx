@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -89,6 +90,8 @@ const Navbar = () => {
               </Link>
             </>
           )}
+
+          <NotificationBell />
 
           <span className="user-name">
             {user.name}

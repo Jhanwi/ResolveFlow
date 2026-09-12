@@ -1,4 +1,7 @@
 const pool = require("../config/db");
+const {
+  createNotification
+} = require("../services/notificationService");
 
 const getAgentTickets = async (req, res) => {
   try {
@@ -110,10 +113,14 @@ const replyToTicket = async (req, res) => {
     }
 
     const ticketResult = await pool.query(
-      `SELECT id, status
-       FROM tickets
-       WHERE id = $1
-       AND assigned_agent_id = $2`,
+     `SELECT
+      id,
+      status,
+      customer_id,
+      subject
+      FROM tickets
+      WHERE id = $1
+      AND assigned_agent_id = $3`,
       [id, req.user.id]
     );
 
@@ -141,6 +148,12 @@ const replyToTicket = async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
       [id]
+    );
+
+    await createNotification(
+     ticketResult.rows[0].customer_id,
+     `Agent replied to ticket #${id}: ${ticketResult.rows[0].subject}`,
+     Number(id)
     );
 
     res.status(201).json({
@@ -243,6 +256,14 @@ const updateTicketStatus = async (req, res) => {
       return res.status(404).json({
         message: "Ticket not found or not assigned to you"
       });
+    }
+
+    if (status === "resolved") {
+      await createNotification(
+        result.rows[0].customer_id,
+       `Ticket #${id} has been resolved`,
+       Number(id)
+     );
     }
 
     res.json({
@@ -353,6 +374,12 @@ const assignTicket = async (req, res) => {
       });
     }
 
+    await createNotification(
+     agentId,
+     `Ticket #${id} has been assigned to you`,
+     Number(id)
+    );
+
     res.json({
       message: "Ticket assigned successfully",
       ticket: result.rows[0]
@@ -387,6 +414,20 @@ const escalateTicket = async (req, res) => {
       return res.status(404).json({
         message: "Ticket not found or not assigned to you"
       });
+    }
+
+    const adminsResult = await pool.query(
+     `SELECT id
+      FROM users
+      WHERE role = 'admin'`
+    );
+
+    for (const admin of adminsResult.rows) {
+     await createNotification(
+       admin.id,
+       `Ticket #${id} has been escalated to critical priority`,
+       Number(id)
+      );
     }
 
     res.json({

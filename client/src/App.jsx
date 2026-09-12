@@ -29,6 +29,7 @@ import AdminCustomers from "./pages/admin/Customers";
 import SlaManagement from "./pages/admin/SlaManagement";
 import SlaBreaches from "./pages/admin/SlaBreaches";
 import Analytics from "./pages/admin/Analytics";
+import Notifications from "./pages/Notifications";
 
 const ProtectedRoute = ({
   children,
@@ -243,6 +244,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route
+         path="/notifications"
+         element={
+           <ProtectedRoute roles={["customer","agent","admin"]}>
+             <Notifications />
+            </ProtectedRoute>
+          }
+        />
+        
       </Routes>
     </>
   );

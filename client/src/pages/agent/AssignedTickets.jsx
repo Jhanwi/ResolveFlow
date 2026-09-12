@@ -1,88 +1,97 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAgentTickets } from "../../services/agentService";
-import StatusBadge from "../../components/StatusBadge";
-import PriorityBadge from "../../components/PriorityBadge";
 
 const AssignedTickets = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const result = await getAgentTickets();
-        setTickets(result.tickets);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadTickets();
   }, []);
+
+  const loadTickets = async () => {
+    try {
+      const data = await getAgentTickets();
+      setTickets(data.tickets);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <p>Loading tickets...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Assigned Tickets</h1>
-          <p>Tickets currently assigned to you.</p>
+          <p>
+            Tickets currently assigned to you.
+          </p>
         </div>
       </div>
 
-      {loading ? (
-        <p>Loading tickets...</p>
-      ) : tickets.length === 0 ? (
-        <div className="empty-card">
-          <h3>No assigned tickets</h3>
-          <p>You currently don't have any assigned tickets.</p>
+      {tickets.length === 0 ? (
+        <div className="empty-state">
+          No tickets are currently assigned to you.
         </div>
       ) : (
         <div className="tickets-table">
-          <div className="table-header agent-table-header">
+          <div className="table-header">
             <span>ID</span>
             <span>Subject</span>
             <span>Customer</span>
             <span>Priority</span>
             <span>Status</span>
-            <span></span>
+            <span>Action</span>
           </div>
 
           {tickets.map((ticket) => (
             <div
-              className="table-row agent-table-row"
+              className="table-row"
               key={ticket.id}
             >
               <span>#{ticket.id}</span>
 
-              <span>
-                <strong>{ticket.subject}</strong>
-
-                <small>
-                  {ticket.category || "General"}
-                </small>
-              </span>
+              <span>{ticket.subject}</span>
 
               <span>
                 {ticket.customer_name}
               </span>
 
-              <PriorityBadge
-                priority={ticket.priority}
-              />
+              <span>
+                <span
+                  className={`badge priority-${ticket.priority}`}
+                >
+                  {ticket.priority}
+                </span>
+              </span>
 
-              <StatusBadge
-                status={ticket.status}
-              />
+              <span>
+                <span
+                  className={`badge status-${ticket.status}`}
+                >
+                  {ticket.status.replaceAll("_", " ")}
+                </span>
+              </span>
 
-              <Link
-                to={`/agent/tickets/${ticket.id}`}
-                className="view-link"
-              >
-                View
-              </Link>
+              <span>
+                <Link
+                  to={`/agent/tickets/${ticket.id}`}
+                  className="secondary-button"
+                >
+                  Open
+                </Link>
+              </span>
             </div>
           ))}
         </div>
