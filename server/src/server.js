@@ -6,6 +6,8 @@ const pool = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const agentRoutes = require("./routes/agentRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const slaRoutes = require("./routes/slaRoutes");
 
 const app = express();
 
@@ -41,6 +43,8 @@ app.get("/api/health", async (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/agent", agentRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/sla", slaRoutes);
 
 const PORT = process.env.PORT || 5000;
 
