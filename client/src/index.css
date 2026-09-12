@@ -520,3 +520,159 @@ textarea {
     max-width: 90%;
   }
 }
+
+.role-label {
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.agent-control-card {
+  display: flex;
+  align-items: end;
+  gap: 20px;
+  padding: 20px;
+  margin-bottom: 24px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-group label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.control-group select {
+  min-width: 180px;
+}
+
+.danger-button {
+  padding: 11px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.danger-button:hover {
+  background: #b91c1c;
+}
+
+.danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  padding: 11px 18px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.secondary-button:hover {
+  background: #f9fafb;
+}
+
+.note-form {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.note-form label,
+.reply-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.note-form textarea {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.internal-note {
+  background: #fff7ed;
+  border-left: 4px solid #f59e0b;
+}
+
+.search-card {
+  padding: 20px;
+  margin-bottom: 24px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.search-card input {
+  width: 100%;
+}
+
+.customer-list {
+  display: grid;
+  gap: 12px;
+}
+
+.customer-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.customer-card h3 {
+  margin-bottom: 5px;
+}
+
+.customer-card p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.customer-card > span {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+@media (max-width: 800px) {
+  .agent-control-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-group select {
+    width: 100%;
+  }
+
+  .agent-table-header,
+  .agent-table-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .customer-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}

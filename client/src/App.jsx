@@ -5,7 +5,10 @@ import {
   Navigate
 } from "react-router-dom";
 
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import {
+  AuthProvider,
+  useAuth
+} from "./context/AuthContext";
 
 import Navbar from "./components/Navbar";
 
@@ -17,15 +20,34 @@ import CreateTicket from "./pages/customer/CreateTicket";
 import MyTickets from "./pages/customer/MyTickets";
 import TicketDetails from "./pages/customer/TicketDetails";
 
-const ProtectedRoute = ({ children }) => {
+import AgentDashboard from "./pages/agent/Dashboard";
+import AssignedTickets from "./pages/agent/AssignedTickets";
+import AgentTicketDetails from "./pages/agent/TicketDetails";
+import Customers from "./pages/agent/Customers";
+
+const ProtectedRoute = ({
+  children,
+  roles
+}) => {
   const { user } = useAuth();
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user.role !== "customer") {
-    return <Navigate to="/login" replace />;
+  if (!roles.includes(user.role)) {
+    if (user.role === "customer") {
+      return (
+        <Navigate to="/dashboard" replace />
+      );
+    }
+
+    return (
+      <Navigate
+        to="/agent/dashboard"
+        replace
+      />
+    );
   }
 
   return children;
@@ -40,7 +62,10 @@ const AppContent = () => {
         <Route
           path="/"
           element={
-            <Navigate to="/dashboard" replace />
+            <Navigate
+              to="/dashboard"
+              replace
+            />
           }
         />
 
@@ -54,10 +79,12 @@ const AppContent = () => {
           element={<Register />}
         />
 
+        {/* Customer routes */}
+
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={["customer"]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -66,7 +93,7 @@ const AppContent = () => {
         <Route
           path="/tickets"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={["customer"]}>
               <MyTickets />
             </ProtectedRoute>
           }
@@ -75,7 +102,7 @@ const AppContent = () => {
         <Route
           path="/tickets/create"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={["customer"]}>
               <CreateTicket />
             </ProtectedRoute>
           }
@@ -84,8 +111,54 @@ const AppContent = () => {
         <Route
           path="/tickets/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={["customer"]}>
               <TicketDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Agent routes */}
+
+        <Route
+          path="/agent/dashboard"
+          element={
+            <ProtectedRoute
+              roles={["agent", "admin"]}
+            >
+              <AgentDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/agent/tickets"
+          element={
+            <ProtectedRoute
+              roles={["agent", "admin"]}
+            >
+              <AssignedTickets />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/agent/tickets/:id"
+          element={
+            <ProtectedRoute
+              roles={["agent", "admin"]}
+            >
+              <AgentTicketDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/agent/customers"
+          element={
+            <ProtectedRoute
+              roles={["agent", "admin"]}
+            >
+              <Customers />
             </ProtectedRoute>
           }
         />
@@ -93,7 +166,10 @@ const AppContent = () => {
         <Route
           path="*"
           element={
-            <Navigate to="/dashboard" replace />
+            <Navigate
+              to="/dashboard"
+              replace
+            />
           }
         />
       </Routes>

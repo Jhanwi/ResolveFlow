@@ -31,9 +31,12 @@ const Login = () => {
       const result = await login(form);
 
       if (result.user.role === "customer") {
-        navigate("/dashboard");
-      } else {
-        setError("This portal is only for customers.");
+       navigate("/dashboard");
+      } else if (
+        result.user.role === "agent" ||
+        result.user.role === "admin"
+      ) {
+       navigate("/agent/dashboard");
       }
     } catch (error) {
       setError(
