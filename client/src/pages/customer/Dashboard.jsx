@@ -10,21 +10,30 @@ const Dashboard = () => {
 
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const result = await getMyTickets();
-        setTickets(result.tickets);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadTickets();
   }, []);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const result = await getMyTickets();
+      setTickets(result.tickets);
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load your tickets"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openTickets = tickets.filter(
     (ticket) => ticket.status !== "resolved"
@@ -36,12 +45,24 @@ const Dashboard = () => {
 
   const recentTickets = tickets.slice(0, 5);
 
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="loading-state">
+          Loading dashboard...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Welcome, {user?.name}</h1>
-          <p>Here's an overview of your support tickets.</p>
+          <p>
+            Here's an overview of your support tickets.
+          </p>
         </div>
 
         <Link
@@ -52,6 +73,12 @@ const Dashboard = () => {
         </Link>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       <div className="stats-grid">
         <div className="stat-card">
           <span>Total Tickets</span>
@@ -60,12 +87,16 @@ const Dashboard = () => {
 
         <div className="stat-card">
           <span>Open Tickets</span>
-          <strong>{openTickets.length}</strong>
+          <strong>
+            {openTickets.length}
+          </strong>
         </div>
 
         <div className="stat-card">
           <span>Resolved</span>
-          <strong>{resolvedTickets.length}</strong>
+          <strong>
+            {resolvedTickets.length}
+          </strong>
         </div>
       </div>
 
@@ -77,12 +108,12 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      {loading ? (
-        <p>Loading tickets...</p>
-      ) : recentTickets.length === 0 ? (
+      {recentTickets.length === 0 ? (
         <div className="empty-card">
           <h3>No tickets yet</h3>
-          <p>Create your first support ticket.</p>
+          <p>
+            Create your first support ticket.
+          </p>
 
           <Link
             to="/tickets/create"
@@ -107,7 +138,8 @@ const Dashboard = () => {
                 <h3>{ticket.subject}</h3>
 
                 <p>
-                  {ticket.category || "General Support"}
+                  {ticket.category ||
+                    "General Support"}
                 </p>
               </div>
 

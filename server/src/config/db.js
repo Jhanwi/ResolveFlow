@@ -1,4 +1,10 @@
+const path = require("path");
+const dotenv = require("dotenv");
 const { Pool } = require("pg");
+
+dotenv.config({
+  path: path.join(__dirname, "../../.env")
+});
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -9,7 +15,10 @@ const pool = new Pool({
 });
 
 pool.on("error", (err) => {
-  console.error("Unexpected database error:", err);
+  console.error(
+    "Unexpected database error:",
+    err
+  );
 });
 
 module.exports = pool;

@@ -7,21 +7,30 @@ import PriorityBadge from "../../components/PriorityBadge";
 const MyTickets = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const result = await getMyTickets();
-        setTickets(result.tickets);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadTickets();
   }, []);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const result = await getMyTickets();
+      setTickets(result.tickets);
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load tickets"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="page">
@@ -41,12 +50,30 @@ const MyTickets = () => {
         </Link>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <p>Loading tickets...</p>
+        <div className="loading-state">
+          Loading tickets...
+        </div>
       ) : tickets.length === 0 ? (
         <div className="empty-card">
           <h3>No tickets found</h3>
-          <p>You haven't created any support tickets yet.</p>
+
+          <p>
+            You haven't created any support tickets yet.
+          </p>
+
+          <Link
+            to="/tickets/create"
+            className="primary-button"
+          >
+            Create Ticket
+          </Link>
         </div>
       ) : (
         <div className="tickets-table">
@@ -66,7 +93,10 @@ const MyTickets = () => {
               <span>#{ticket.id}</span>
 
               <span>
-                <strong>{ticket.subject}</strong>
+                <strong>
+                  {ticket.subject}
+                </strong>
+
                 <small>
                   {ticket.category || "General"}
                 </small>

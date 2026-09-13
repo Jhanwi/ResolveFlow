@@ -16,6 +16,7 @@ import { getAllTickets } from "../../services/adminService";
 const Analytics = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadTickets();
@@ -23,10 +24,18 @@ const Analytics = () => {
 
   const loadTickets = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getAllTickets();
       setTickets(data.tickets);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load analytics"
+      );
     } finally {
       setLoading(false);
     }
@@ -96,7 +105,9 @@ const Analytics = () => {
   if (loading) {
     return (
       <div className="page">
-        <p>Loading analytics...</p>
+        <div className="loading-state">
+          Loading analytics...
+        </div>
       </div>
     );
   }
@@ -112,46 +123,60 @@ const Analytics = () => {
         </div>
       </div>
 
-      <div className="analytics-grid">
-        <div className="chart-card">
-          <h2>Tickets by Priority</h2>
-
-          <PieChart width={420} height={320}>
-            <Pie
-             data={priorityData}
-             dataKey="value"
-             nameKey="name"
-             cx="50%"
-             cy="50%"
-             outerRadius={100}
-             label
-            />
-
-            <Tooltip />
-            <Legend />
-          </PieChart>
+      {error ? (
+        <div className="form-message error">
+          {error}
         </div>
-
-        <div className="chart-card">
-          <h2>Tickets by Status</h2>
-
-          <BarChart
-            width={500}
-            height={320}
-            data={statusData}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-
-            <XAxis dataKey="name" />
-
-            <YAxis allowDecimals={false} />
-
-            <Tooltip />
-
-            <Bar dataKey="value" />
-          </BarChart>
+      ) : tickets.length === 0 ? (
+        <div className="empty-state">
+          <h3>No ticket data available</h3>
+          <p>
+            Analytics will appear here after support tickets
+            are created.
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="analytics-grid">
+          <div className="chart-card">
+            <h2>Tickets by Priority</h2>
+
+            <PieChart width={420} height={320}>
+              <Pie
+                data={priorityData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                label
+              />
+
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </div>
+
+          <div className="chart-card">
+            <h2>Tickets by Status</h2>
+
+            <BarChart
+              width={500}
+              height={320}
+              data={statusData}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+
+              <XAxis dataKey="name" />
+
+              <YAxis allowDecimals={false} />
+
+              <Tooltip />
+
+              <Bar dataKey="value" />
+            </BarChart>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

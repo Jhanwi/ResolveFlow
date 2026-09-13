@@ -5,6 +5,7 @@ import { getSlaBreaches } from "../../services/adminService";
 const SlaBreaches = () => {
   const [breaches, setBreaches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadBreaches();
@@ -12,10 +13,18 @@ const SlaBreaches = () => {
 
   const loadBreaches = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getSlaBreaches();
       setBreaches(data.breaches);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load SLA breaches"
+      );
     } finally {
       setLoading(false);
     }
@@ -32,12 +41,26 @@ const SlaBreaches = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <p>Loading SLA breaches...</p>
+        <div className="loading-state">
+          Loading SLA breaches...
+        </div>
       ) : breaches.length === 0 ? (
         <div className="empty-state">
           <AlertTriangle size={32} />
-          <p>No SLA breaches found.</p>
+
+          <h3>No SLA breaches found</h3>
+
+          <p>
+            Tickets that exceed their resolution SLA will
+            appear here.
+          </p>
         </div>
       ) : (
         <div className="tickets-table">

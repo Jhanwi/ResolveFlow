@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   getSlaPolicies,
   createSlaPolicy,
@@ -8,10 +9,13 @@ import {
 const SlaManagement = () => {
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [priority, setPriority] = useState("low");
+
   const [responseMinutes, setResponseMinutes] =
     useState("");
+
   const [resolutionMinutes, setResolutionMinutes] =
     useState("");
 
@@ -23,10 +27,18 @@ const SlaManagement = () => {
 
   const loadPolicies = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getSlaPolicies();
       setPolicies(data.policies);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load SLA policies"
+      );
     } finally {
       setLoading(false);
     }
@@ -43,6 +55,8 @@ const SlaManagement = () => {
     e.preventDefault();
 
     try {
+      setError("");
+
       const policyData = {
         priority,
         responseMinutes: Number(responseMinutes),
@@ -59,9 +73,11 @@ const SlaManagement = () => {
       }
 
       resetForm();
-      loadPolicies();
+      await loadPolicies();
     } catch (error) {
-      alert(
+      console.error(error);
+
+      setError(
         error.response?.data?.message ||
           "Unable to save SLA policy"
       );
@@ -71,9 +87,11 @@ const SlaManagement = () => {
   const startEdit = (policy) => {
     setEditingId(policy.id);
     setPriority(policy.priority);
+
     setResponseMinutes(
       policy.response_minutes
     );
+
     setResolutionMinutes(
       policy.resolution_minutes
     );
@@ -89,6 +107,12 @@ const SlaManagement = () => {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
 
       <div className="admin-form-card">
         <h2>
@@ -111,12 +135,15 @@ const SlaManagement = () => {
                 <option value="critical">
                   Critical
                 </option>
+
                 <option value="high">
                   High
                 </option>
+
                 <option value="medium">
                   Medium
                 </option>
+
                 <option value="low">
                   Low
                 </option>
@@ -165,7 +192,9 @@ const SlaManagement = () => {
               type="submit"
               className="primary-button"
             >
-              {editingId ? "Update Policy" : "Add Policy"}
+              {editingId
+                ? "Update Policy"
+                : "Add Policy"}
             </button>
 
             {editingId && (
@@ -185,7 +214,17 @@ const SlaManagement = () => {
         <h2>Current SLA Policies</h2>
 
         {loading ? (
-          <p>Loading policies...</p>
+          <div className="loading-state">
+            Loading policies...
+          </div>
+        ) : policies.length === 0 ? (
+          <div className="empty-state">
+            <h3>No SLA policies found</h3>
+            <p>
+              Add an SLA policy to start tracking response
+              and resolution targets.
+            </p>
+          </div>
         ) : (
           <div className="tickets-table">
             <div className="table-header">

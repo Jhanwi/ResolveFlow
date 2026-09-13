@@ -4,6 +4,7 @@ import { getAgents } from "../../services/adminService";
 const Agents = () => {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadAgents();
@@ -11,10 +12,18 @@ const Agents = () => {
 
   const loadAgents = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getAgents();
       setAgents(data.agents);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load agents"
+      );
     } finally {
       setLoading(false);
     }
@@ -31,11 +40,23 @@ const Agents = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <p>Loading agents...</p>
+        <div className="loading-state">
+          Loading agents...
+        </div>
       ) : agents.length === 0 ? (
         <div className="empty-state">
-          No agents found.
+          <h3>No agents found</h3>
+          <p>
+            Support agents will appear here when they are
+            available.
+          </p>
         </div>
       ) : (
         <div className="admin-card-grid">

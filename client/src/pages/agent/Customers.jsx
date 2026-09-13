@@ -4,19 +4,31 @@ import { getAgentTickets } from "../../services/agentService";
 const Customers = () => {
   const [tickets, setTickets] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const result = await getAgentTickets();
-        setTickets(result.tickets);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
     loadTickets();
   }, []);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const result = await getAgentTickets();
+      setTickets(result.tickets);
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load customers"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const customers = [];
 
@@ -52,7 +64,9 @@ const Customers = () => {
       <div className="page-header">
         <div>
           <h1>Customers</h1>
-          <p>Customers associated with your assigned tickets.</p>
+          <p>
+            Customers associated with your assigned tickets.
+          </p>
         </div>
       </div>
 
@@ -64,14 +78,26 @@ const Customers = () => {
           onChange={(e) =>
             setSearch(e.target.value)
           }
+          disabled={loading}
         />
       </div>
 
-      {filteredCustomers.length === 0 ? (
-        <div className="empty-card">
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="loading-state">
+          Loading customers...
+        </div>
+      ) : filteredCustomers.length === 0 ? (
+        <div className="empty-state">
           <h3>No customers found</h3>
           <p>
-            Customers will appear here when tickets are assigned to you.
+            Customers associated with your assigned tickets
+            will appear here.
           </p>
         </div>
       ) : (

@@ -11,21 +11,30 @@ const Dashboard = () => {
 
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const result = await getAgentTickets();
-        setTickets(result.tickets);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadTickets();
   }, []);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const result = await getAgentTickets();
+      setTickets(result.tickets);
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load dashboard"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const pendingTickets = tickets.filter(
     (ticket) => ticket.status !== "resolved"
@@ -47,18 +56,38 @@ const Dashboard = () => {
     }
 
     return (
-      new Date(ticket.resolution_due_at) < new Date(Date.now() + 2 * 60 * 60 * 1000)
+      new Date(ticket.resolution_due_at) <
+      new Date(Date.now() + 2 * 60 * 60 * 1000)
     );
   });
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="loading-state">
+          Loading dashboard...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Welcome, {user?.name}</h1>
-          <p>Here's an overview of your assigned support tickets.</p>
+          <p>
+            Here's an overview of your assigned support
+            tickets.
+          </p>
         </div>
       </div>
+
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
 
       <div className="stats-grid">
         <div className="stat-card">
@@ -68,17 +97,23 @@ const Dashboard = () => {
 
         <div className="stat-card">
           <span>Pending</span>
-          <strong>{pendingTickets.length}</strong>
+          <strong>
+            {pendingTickets.length}
+          </strong>
         </div>
 
         <div className="stat-card">
           <span>Resolved</span>
-          <strong>{resolvedTickets.length}</strong>
+          <strong>
+            {resolvedTickets.length}
+          </strong>
         </div>
 
         <div className="stat-card">
           <span>Critical</span>
-          <strong>{criticalTickets.length}</strong>
+          <strong>
+            {criticalTickets.length}
+          </strong>
         </div>
       </div>
 
@@ -86,12 +121,12 @@ const Dashboard = () => {
         <h2>SLA At Risk</h2>
       </div>
 
-      {loading ? (
-        <p>Loading tickets...</p>
-      ) : atRiskTickets.length === 0 ? (
+      {atRiskTickets.length === 0 ? (
         <div className="empty-card">
           <h3>No tickets at risk</h3>
-          <p>Your current tickets are within their SLA.</p>
+          <p>
+            Your current tickets are within their SLA.
+          </p>
         </div>
       ) : (
         <div className="ticket-list">
@@ -140,12 +175,12 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      {loading ? (
-        <p>Loading tickets...</p>
-      ) : tickets.length === 0 ? (
+      {tickets.length === 0 ? (
         <div className="empty-card">
           <h3>No tickets assigned</h3>
-          <p>New tickets assigned to you will appear here.</p>
+          <p>
+            New tickets assigned to you will appear here.
+          </p>
         </div>
       ) : (
         <div className="ticket-list">

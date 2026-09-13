@@ -5,6 +5,7 @@ import { getAgentTickets } from "../../services/agentService";
 const AssignedTickets = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadTickets();
@@ -12,10 +13,18 @@ const AssignedTickets = () => {
 
   const loadTickets = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getAgentTickets();
       setTickets(data.tickets);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load assigned tickets"
+      );
     } finally {
       setLoading(false);
     }
@@ -24,7 +33,9 @@ const AssignedTickets = () => {
   if (loading) {
     return (
       <div className="page">
-        <p>Loading tickets...</p>
+        <div className="loading-state">
+          Loading tickets...
+        </div>
       </div>
     );
   }
@@ -40,9 +51,18 @@ const AssignedTickets = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       {tickets.length === 0 ? (
         <div className="empty-state">
-          No tickets are currently assigned to you.
+          <h3>No tickets assigned</h3>
+          <p>
+            Tickets assigned to you will appear here.
+          </p>
         </div>
       ) : (
         <div className="tickets-table">

@@ -1,0 +1,64 @@
+services:
+
+  database:
+    image: postgres:16-alpine
+    container_name: resolveflow-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: resolveflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: resolveflow_db_password
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+
+    ports:
+      - "5433:5432"
+
+
+  server:
+    build:
+      context: ./server
+
+    container_name: resolveflow-server
+    restart: unless-stopped
+
+    environment:
+      PORT: 5000
+
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: resolveflow
+      DB_USER: postgres
+      DB_PASSWORD: resolveflow_db_password
+
+      JWT_SECRET: resolveflow_docker_secret
+
+    depends_on:
+      - database
+
+    ports:
+      - "5000:5000"
+
+    volumes:
+      - ./server/uploads:/app/uploads
+
+
+  client:
+    build:
+      context: ./client
+
+    container_name: resolveflow-client
+    restart: unless-stopped
+
+    depends_on:
+      - server
+
+    ports:
+      - "5173:80"
+
+
+volumes:
+  postgres_data:

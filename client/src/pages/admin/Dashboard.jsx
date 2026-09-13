@@ -8,6 +8,7 @@ import {
   Clock,
   AlertTriangle
 } from "lucide-react";
+
 import {
   getDashboard,
   getAllTickets
@@ -17,6 +18,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentTickets, setRecentTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadDashboard();
@@ -24,6 +26,9 @@ const Dashboard = () => {
 
   const loadDashboard = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const [dashboardData, ticketData] =
         await Promise.all([
           getDashboard(),
@@ -31,11 +36,17 @@ const Dashboard = () => {
         ]);
 
       setStats(dashboardData.stats);
+
       setRecentTickets(
         ticketData.tickets.slice(0, 5)
       );
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load dashboard"
+      );
     } finally {
       setLoading(false);
     }
@@ -44,7 +55,9 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="page">
-        <p>Loading dashboard...</p>
+        <div className="loading-state">
+          Loading dashboard...
+        </div>
       </div>
     );
   }
@@ -60,25 +73,38 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       <div className="stats-grid">
         <div className="stat-card">
           <Ticket size={24} />
+
           <div>
             <span>Total Tickets</span>
-            <strong>{stats?.totalTickets || 0}</strong>
+            <strong>
+              {stats?.totalTickets || 0}
+            </strong>
           </div>
         </div>
 
         <div className="stat-card">
           <Clock size={24} />
+
           <div>
             <span>Open Tickets</span>
-            <strong>{stats?.openTickets || 0}</strong>
+            <strong>
+              {stats?.openTickets || 0}
+            </strong>
           </div>
         </div>
 
         <div className="stat-card">
           <CheckCircle size={24} />
+
           <div>
             <span>Resolved</span>
             <strong>
@@ -89,22 +115,29 @@ const Dashboard = () => {
 
         <div className="stat-card">
           <Users size={24} />
+
           <div>
             <span>Agents</span>
-            <strong>{stats?.agents || 0}</strong>
+            <strong>
+              {stats?.agents || 0}
+            </strong>
           </div>
         </div>
 
         <div className="stat-card">
           <UserRound size={24} />
+
           <div>
             <span>Customers</span>
-            <strong>{stats?.customers || 0}</strong>
+            <strong>
+              {stats?.customers || 0}
+            </strong>
           </div>
         </div>
 
         <div className="stat-card">
           <AlertTriangle size={24} />
+
           <div>
             <span>SLA Compliance</span>
             <strong>
@@ -128,7 +161,11 @@ const Dashboard = () => {
 
         {recentTickets.length === 0 ? (
           <div className="empty-state">
-            No tickets available.
+            <h3>No tickets available</h3>
+            <p>
+              Recent tickets will appear here when customers
+              create support requests.
+            </p>
           </div>
         ) : (
           <div className="tickets-table">

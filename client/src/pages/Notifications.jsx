@@ -17,12 +17,18 @@ const Notifications = () => {
   const [loading, setLoading] =
     useState(true);
 
+  const [error, setError] =
+    useState("");
+
   useEffect(() => {
     loadNotifications();
   }, []);
 
   const loadNotifications = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getNotifications();
 
       setNotifications(
@@ -30,6 +36,11 @@ const Notifications = () => {
       );
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load notifications"
+      );
     } finally {
       setLoading(false);
     }
@@ -37,6 +48,8 @@ const Notifications = () => {
 
   const handleRead = async (id) => {
     try {
+      setError("");
+
       await markAsRead(id);
 
       setNotifications((current) =>
@@ -51,11 +64,18 @@ const Notifications = () => {
       );
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to mark notification as read"
+      );
     }
   };
 
   const handleReadAll = async () => {
     try {
+      setError("");
+
       await markAllAsRead();
 
       setNotifications((current) =>
@@ -66,6 +86,11 @@ const Notifications = () => {
       );
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to mark notifications as read"
+      );
     }
   };
 
@@ -95,11 +120,21 @@ const Notifications = () => {
         )}
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <p>Loading notifications...</p>
+        <div className="loading-state">
+          Loading notifications...
+        </div>
       ) : notifications.length === 0 ? (
         <div className="empty-state">
           <Bell size={32} />
+
+          <h3>No notifications yet</h3>
 
           <p>
             You don't have any notifications yet.

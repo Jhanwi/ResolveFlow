@@ -4,6 +4,7 @@ import { getCustomers } from "../../services/adminService";
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadCustomers();
@@ -11,10 +12,18 @@ const Customers = () => {
 
   const loadCustomers = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getCustomers();
       setCustomers(data.customers);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load customers"
+      );
     } finally {
       setLoading(false);
     }
@@ -31,11 +40,23 @@ const Customers = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       {loading ? (
-        <p>Loading customers...</p>
+        <div className="loading-state">
+          Loading customers...
+        </div>
       ) : customers.length === 0 ? (
         <div className="empty-state">
-          No customers found.
+          <h3>No customers found</h3>
+          <p>
+            Customer accounts will appear here after
+            registration.
+          </p>
         </div>
       ) : (
         <div className="tickets-table">
