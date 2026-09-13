@@ -31,17 +31,18 @@ const getAgentTicketDetails = async (id) => {
   return response.data;
 };
 
-const replyToTicket = async (id, message) => {
+const replyToTicket = async (id, messageData) => {
   const response = await axios.post(
     `${API_URL}/tickets/${id}/reply`,
+    messageData,
     {
-      message
-    },
-    {
-      headers: getHeaders()
+      headers: {
+        ...getHeaders(),
+        "Content-Type": "multipart/form-data"
+      }
     }
   );
-
+  
   return response.data;
 };
 

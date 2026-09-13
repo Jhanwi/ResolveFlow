@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+
 import {
   getAgentTicketDetails,
   replyToTicket,
@@ -12,11 +13,10 @@ import {
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import SlaTimer from "../../components/SlaTimer";
-import { useAuth } from "../../context/AuthContext";
 
 const TicketDetails = () => {
   const { id } = useParams();
-  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [ticket, setTicket] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -24,158 +24,282 @@ const TicketDetails = () => {
   const [message, setMessage] = useState("");
   const [note, setNote] = useState("");
 
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
+  const [attachment, setAttachment] =
+    useState(null);
 
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(true);
+
+  const [sending, setSending] =
+    useState(false);
+
+  const [addingNote, setAddingNote] =
+    useState(false);
+
+  const [updating, setUpdating] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  useEffect(() => {
+    loadTicket();
+  }, [id]);
 
   const loadTicket = async () => {
     try {
-      const result = await getAgentTicketDetails(id);
+      setLoading(true);
+      setError("");
 
-      setTicket(result.ticket);
-      setMessages(result.messages);
+      const data =
+        await getAgentTicketDetails(id);
 
-      setStatus(result.ticket.status);
-      setPriority(result.ticket.priority);
+      setTicket(data.ticket);
+      setMessages(data.messages);
     } catch (error) {
+      console.error(error);
+
       setError(
         error.response?.data?.message ||
-        "Unable to load ticket"
+          "Unable to load ticket"
       );
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadTicket();
-  }, [id]);
+  const handleFileChange = (event) => {
+    const file =
+      event.target.files[0];
 
-  const handleReply = async (e) => {
-    e.preventDefault();
-
-    if (!message.trim()) {
+    if (!file) {
+      setAttachment(null);
       return;
     }
 
-    setSending(true);
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "application/pdf"
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError(
+        "Only PNG, JPG, JPEG and PDF files are allowed"
+      );
+
+      event.target.value = "";
+      setAttachment(null);
+
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        "File size must be 5 MB or less"
+      );
+
+      event.target.value = "";
+      setAttachment(null);
+
+      return;
+    }
+
     setError("");
+    setAttachment(file);
+  };
+
+  const handleReply = async (event) => {
+    event.preventDefault();
+
+    if (!message.trim() && !attachment) {
+      setError(
+        "Message or attachment is required"
+      );
+
+      return;
+    }
 
     try {
-      await replyToTicket(id, message.trim());
+      setSending(true);
+      setError("");
+
+      const formData = new FormData();
+
+      if (message.trim()) {
+        formData.append(
+          "message",
+          message.trim()
+        );
+      }
+
+      if (attachment) {
+        formData.append(
+          "attachment",
+          attachment
+        );
+      }
+
+      await replyToTicket(
+        id,
+        formData
+      );
 
       setMessage("");
+      setAttachment(null);
+
+      const fileInput =
+        document.getElementById(
+          "agent-attachment"
+        );
+
+      if (fileInput) {
+        fileInput.value = "";
+      }
 
       await loadTicket();
     } catch (error) {
+      console.error(error);
+
       setError(
         error.response?.data?.message ||
-        "Unable to send reply"
+          "Unable to send reply"
       );
     } finally {
       setSending(false);
     }
   };
 
-  const handleNote = async (e) => {
-    e.preventDefault();
+  const handleInternalNote = async (
+    event
+  ) => {
+    event.preventDefault();
 
     if (!note.trim()) {
+      setError("Note is required");
       return;
     }
 
-    setSending(true);
-    setError("");
-
     try {
-      await addInternalNote(id, note.trim());
+      setAddingNote(true);
+      setError("");
+
+      await addInternalNote(
+        id,
+        note.trim()
+      );
 
       setNote("");
 
       await loadTicket();
     } catch (error) {
+      console.error(error);
+
       setError(
         error.response?.data?.message ||
-        "Unable to add internal note"
+          "Unable to add internal note"
       );
     } finally {
-      setSending(false);
+      setAddingNote(false);
     }
   };
 
-  const handleStatusChange = async (e) => {
-    const newStatus = e.target.value;
-
-    setStatus(newStatus);
-    setSaving(true);
-    setError("");
+  const handleStatusChange = async (
+    event
+  ) => {
+    const newStatus =
+      event.target.value;
 
     try {
-      const result = await updateTicketStatus(
+      setUpdating(true);
+      setError("");
+
+      await updateTicketStatus(
         id,
         newStatus
       );
 
-      setTicket(result.ticket);
+      await loadTicket();
     } catch (error) {
+      console.error(error);
+
       setError(
         error.response?.data?.message ||
-        "Unable to update status"
+          "Unable to update status"
       );
-
-      await loadTicket();
     } finally {
-      setSaving(false);
+      setUpdating(false);
     }
   };
 
-  const handlePriorityChange = async (e) => {
-    const newPriority = e.target.value;
-
-    setPriority(newPriority);
-    setSaving(true);
-    setError("");
+  const handlePriorityChange = async (
+    event
+  ) => {
+    const newPriority =
+      event.target.value;
 
     try {
-      const result = await updateTicketPriority(
+      setUpdating(true);
+      setError("");
+
+      await updateTicketPriority(
         id,
         newPriority
       );
 
-      setTicket(result.ticket);
+      await loadTicket();
     } catch (error) {
+      console.error(error);
+
       setError(
         error.response?.data?.message ||
-        "Unable to update priority"
+          "Unable to update priority"
       );
-
-      await loadTicket();
     } finally {
-      setSaving(false);
+      setUpdating(false);
     }
   };
 
   const handleEscalate = async () => {
-    setSaving(true);
-    setError("");
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to escalate this ticket?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
 
     try {
-      const result = await escalateTicket(id);
+      setUpdating(true);
+      setError("");
 
-      setTicket(result.ticket);
-      setPriority(result.ticket.priority);
+      await escalateTicket(id);
+
+      await loadTicket();
     } catch (error) {
+      console.error(error);
+
       setError(
         error.response?.data?.message ||
-        "Unable to escalate ticket"
+          "Unable to escalate ticket"
       );
     } finally {
-      setSaving(false);
+      setUpdating(false);
     }
+  };
+
+  const getAttachmentName = (
+    attachmentUrl
+  ) => {
+    if (!attachmentUrl) {
+      return "";
+    }
+
+    const parts =
+      attachmentUrl.split("/");
+
+    return parts[parts.length - 1];
   };
 
   if (loading) {
@@ -189,8 +313,21 @@ const TicketDetails = () => {
   if (!ticket) {
     return (
       <div className="page">
-        <div className="error-message">
-          {error || "Ticket not found"}
+        <div className="empty-state">
+          <p>
+            {error || "Ticket not found."}
+          </p>
+
+          <button
+            className="secondary-button"
+            onClick={() =>
+              navigate(
+                "/agent/tickets"
+              )
+            }
+          >
+            Back to Assigned Tickets
+          </button>
         </div>
       </div>
     );
@@ -198,194 +335,361 @@ const TicketDetails = () => {
 
   return (
     <div className="page">
-      <div className="ticket-header">
+      <div className="page-header">
         <div>
-          <span className="ticket-id">
+          <button
+            className="secondary-button"
+            onClick={() =>
+              navigate(
+                "/agent/tickets"
+              )
+            }
+          >
+            ← Back to Assigned Tickets
+          </button>
+
+          <h1>
             Ticket #{ticket.id}
-          </span>
-
-          <h1>{ticket.subject}</h1>
+          </h1>
 
           <p>
-            Customer: {ticket.customer_name}
+            Created on{" "}
+            {new Date(
+              ticket.created_at
+            ).toLocaleString()}
           </p>
-
-          <p>
-            {ticket.customer_email}
-          </p>
-        </div>
-
-        <div className="ticket-status">
-          <PriorityBadge
-            priority={ticket.priority}
-          />
-
-          <StatusBadge
-            status={ticket.status}
-          />
         </div>
       </div>
 
       {error && (
-        <div className="error-message">
+        <div className="form-message error">
           {error}
         </div>
       )}
 
-      <div className="agent-control-card">
-        <div className="control-group">
-          <label>Status</label>
+      <div className="ticket-header">
+        <div>
+          <h2>
+            {ticket.subject}
+          </h2>
 
-          <select
-            value={status}
-            onChange={handleStatusChange}
-            disabled={saving}
-          >
-            <option value="open">Open</option>
-            <option value="assigned">Assigned</option>
-            <option value="in_progress">
-              In Progress
-            </option>
-            <option value="waiting_for_customer">
-              Waiting for Customer
-            </option>
-            <option value="resolved">Resolved</option>
-          </select>
+          <p>
+            {ticket.description}
+          </p>
+
+          <div className="ticket-customer">
+            <strong>
+              Customer:
+            </strong>{" "}
+            {ticket.customer_name}
+
+            {" · "}
+
+            {ticket.customer_email}
+          </div>
         </div>
 
-        <div className="control-group">
-          <label>Priority</label>
+        <div className="ticket-badges">
+          <StatusBadge
+            status={ticket.status}
+          />
 
-          <select
-            value={priority}
-            onChange={handlePriorityChange}
-            disabled={saving}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
+          <PriorityBadge
+            priority={ticket.priority}
+          />
         </div>
-
-        <button
-          className="danger-button"
-          onClick={handleEscalate}
-          disabled={
-            saving || ticket.priority === "critical"
-          }
-        >
-          {ticket.priority === "critical"
-            ? "Critical Priority"
-            : "Escalate Ticket"}
-        </button>
       </div>
 
       <div className="sla-grid">
-        <SlaTimer
-          dueAt={ticket.response_due_at}
-          label="Response SLA"
-        />
+        <div className="sla-timer">
+          <span>
+            Response SLA
+          </span>
 
-        <SlaTimer
-          dueAt={ticket.resolution_due_at}
-          label="Resolution SLA"
-        />
+          <SlaTimer
+            dueAt={
+              ticket.response_due_at
+            }
+          />
+        </div>
+
+        <div className="sla-timer">
+          <span>
+            Resolution SLA
+          </span>
+
+          <SlaTimer
+            dueAt={
+              ticket.resolution_due_at
+            }
+          />
+        </div>
+      </div>
+
+      <div className="ticket-actions">
+        <div className="form-group">
+          <label htmlFor="status">
+            Status
+          </label>
+
+          <select
+            id="status"
+            value={ticket.status}
+            onChange={
+              handleStatusChange
+            }
+            disabled={updating}
+          >
+            <option value="open">
+              Open
+            </option>
+
+            <option value="assigned">
+              Assigned
+            </option>
+
+            <option value="in_progress">
+              In Progress
+            </option>
+
+            <option value="waiting_for_customer">
+              Waiting for Customer
+            </option>
+
+            <option value="resolved">
+              Resolved
+            </option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="priority">
+            Priority
+          </label>
+
+          <select
+            id="priority"
+            value={ticket.priority}
+            onChange={
+              handlePriorityChange
+            }
+            disabled={updating}
+          >
+            <option value="low">
+              Low
+            </option>
+
+            <option value="medium">
+              Medium
+            </option>
+
+            <option value="high">
+              High
+            </option>
+
+            <option value="critical">
+              Critical
+            </option>
+          </select>
+        </div>
+
+        {ticket.status !==
+          "resolved" && (
+          <button
+            className="secondary-button"
+            onClick={
+              handleEscalate
+            }
+            disabled={updating}
+          >
+            {updating
+              ? "Updating..."
+              : "Escalate Ticket"}
+          </button>
+        )}
       </div>
 
       <div className="conversation-card">
-        <div className="conversation-header">
-          <h2>Customer Conversation</h2>
+        <div className="section-header">
+          <div>
+            <h2>
+              Conversation
+            </h2>
+
+            <p>
+              Communicate with the
+              customer about the issue.
+            </p>
+          </div>
         </div>
 
         <div className="messages">
-          {messages.map((item) => {
-            const isInternalNote =
-              item.message.startsWith("[Internal Note]");
+          {messages.length === 0 ? (
+            <p>
+              No messages yet.
+            </p>
+          ) : (
+            messages.map(
+              (item) => (
+                <div
+                  key={item.id}
+                  className={`message ${
+                    item.sender_role ===
+                    "customer"
+                      ? "customer-message"
+                      : "agent-message"
+                  }`}
+                >
+                  <div className="message-header">
+                    <strong>
+                      {item.sender_name}
+                    </strong>
 
-            return (
-              <div
-                className={`message ${
-                  isInternalNote
-                    ? "internal-note"
-                    : item.sender_id === user.id
-                    ? "customer-message"
-                    : "agent-message"
-                }`}
-                key={item.id}
-              >
-                <div className="message-top">
-                  <strong>
-                    {isInternalNote
-                      ? "Internal Note"
-                      : item.sender_name}
-                  </strong>
+                    <small>
+                      {new Date(
+                        item.created_at
+                      ).toLocaleString()}
+                    </small>
+                  </div>
 
-                  <span>
-                    {new Date(
-                      item.created_at
-                    ).toLocaleString()}
-                  </span>
+                  <p>
+                    {item.message}
+                  </p>
+
+                  {item.attachment_url && (
+                    <a
+                      href={`http://localhost:5000${item.attachment_url}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="attachment-link"
+                    >
+                      📎{" "}
+                      {getAttachmentName(
+                        item.attachment_url
+                      )}
+                    </a>
+                  )}
                 </div>
-
-                <p>{item.message}</p>
-              </div>
-            );
-          })}
+              )
+            )
+          )}
         </div>
 
-        {ticket.status !== "resolved" && (
+        {ticket.status !==
+          "resolved" && (
           <form
             className="reply-form"
             onSubmit={handleReply}
           >
-            <label>Reply to customer</label>
-
             <textarea
               value={message}
-              onChange={(e) =>
-                setMessage(e.target.value)
+              onChange={(event) =>
+                setMessage(
+                  event.target.value
+                )
               }
-              placeholder="Write a reply to the customer..."
+              placeholder="Write a reply..."
               rows="4"
+              disabled={sending}
             />
+
+            <div className="attachment-input">
+              <label htmlFor="agent-attachment">
+                Attach file
+              </label>
+
+              <input
+                id="agent-attachment"
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf"
+                onChange={
+                  handleFileChange
+                }
+                disabled={sending}
+              />
+
+              <small>
+                PNG, JPG, JPEG or PDF.
+                Maximum 5 MB.
+              </small>
+
+              {attachment && (
+                <small>
+                  Selected:{" "}
+                  {attachment.name}
+                </small>
+              )}
+            </div>
 
             <button
               type="submit"
               className="primary-button"
               disabled={sending}
             >
-              {sending ? "Sending..." : "Send Reply"}
+              {sending
+                ? "Sending..."
+                : "Send Reply"}
             </button>
           </form>
         )}
 
-        <form
-          className="note-form"
-          onSubmit={handleNote}
-        >
-          <label>Internal Note</label>
-
-          <textarea
-            value={note}
-            onChange={(e) =>
-              setNote(e.target.value)
-            }
-            placeholder="Add a note for support staff..."
-            rows="3"
-          />
-
-          <button
-            type="submit"
-            className="secondary-button"
-            disabled={sending}
-          >
-            Add Internal Note
-          </button>
-        </form>
+        {ticket.status ===
+          "resolved" && (
+          <div className="resolved-message">
+            This ticket has been resolved.
+          </div>
+        )}
       </div>
+
+      {ticket.status !==
+        "resolved" && (
+        <div className="conversation-card">
+          <div className="section-header">
+            <div>
+              <h2>
+                Internal Note
+              </h2>
+
+              <p>
+                Add a private note for
+                the support team.
+              </p>
+            </div>
+          </div>
+
+          <form
+            className="reply-form"
+            onSubmit={
+              handleInternalNote
+            }
+          >
+            <textarea
+              value={note}
+              onChange={(event) =>
+                setNote(
+                  event.target.value
+                )
+              }
+              placeholder="Write an internal note..."
+              rows="4"
+              disabled={addingNote}
+            />
+
+            <button
+              type="submit"
+              className="secondary-button"
+              disabled={addingNote}
+            >
+              {addingNote
+                ? "Adding..."
+                : "Add Internal Note"}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
 
 export default TicketDetails;
+

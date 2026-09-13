@@ -15,6 +15,7 @@ const {
 } = require("../controllers/agentController");
 
 const router = express.Router();
+const upload = require("../middleware/uploadMiddleware");
 
 router.use(protect);
 router.use(allowRoles("agent", "admin"));
@@ -28,6 +29,7 @@ router.get(
 
 router.post(
   "/tickets/:id/reply",
+  upload.single("attachment"),
   replyToTicket
 );
 

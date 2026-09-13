@@ -112,9 +112,13 @@ const replyToTicket = async (req, res) => {
     const { id } = req.params;
     const { message } = req.body;
 
-    if (!message || !message.trim()) {
+    if (
+      (!message || !message.trim()) &&
+      !req.file
+    ) {
       return res.status(400).json({
-        message: "Message is required"
+        message:
+          "Message or attachment is required"
       });
     }
 
@@ -132,21 +136,43 @@ const replyToTicket = async (req, res) => {
 
     if (ticketResult.rows.length === 0) {
       return res.status(404).json({
-        message: "Ticket not found or not assigned to you"
+        message:
+          "Ticket not found or not assigned to you"
       });
     }
 
     const ticket = ticketResult.rows[0];
 
+    let attachmentUrl = null;
+
+    if (req.file) {
+      attachmentUrl =
+        `/uploads/${req.file.filename}`;
+    }
+
+    const messageText =
+      message?.trim() ||
+      "Attachment added";
+
     const result = await pool.query(
       `INSERT INTO ticket_messages
-       (ticket_id, sender_id, message)
-       VALUES ($1, $2, $3)
-       RETURNING id, message, created_at`,
+       (
+         ticket_id,
+         sender_id,
+         message,
+         attachment_url
+       )
+       VALUES ($1, $2, $3, $4)
+       RETURNING
+         id,
+         message,
+         attachment_url,
+         created_at`,
       [
         id,
         req.user.id,
-        message.trim()
+        messageText,
+        attachmentUrl
       ]
     );
 

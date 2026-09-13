@@ -2,6 +2,7 @@ const express = require("express");
 
 const protect = require("../middleware/authMiddleware");
 const allowRoles = require("../middleware/roleMiddleware");
+const upload = require("../middleware/uploadMiddleware");
 
 const {
   createTicket,
@@ -15,9 +16,26 @@ const router = express.Router();
 router.use(protect);
 router.use(allowRoles("customer"));
 
-router.post("/tickets", createTicket);
-router.get("/tickets", getMyTickets);
-router.get("/tickets/:id", getTicketDetails);
-router.post("/tickets/:id/messages", addMessage);
+router.post(
+  "/tickets",
+  upload.single("attachment"),
+  createTicket
+);
+
+router.get(
+  "/tickets",
+  getMyTickets
+);
+
+router.get(
+  "/tickets/:id",
+  getTicketDetails
+);
+
+router.post(
+  "/tickets/:id/messages",
+  upload.single("attachment"),
+  addMessage
+);
 
 module.exports = router;

@@ -1,7 +1,8 @@
 import axios from "axios";
 import { getToken } from "./authService";
 
-const API_URL = "http://localhost:5000/api/customer";
+const API_URL =
+  "http://localhost:5000/api/customer";
 
 const getHeaders = () => {
   return {
@@ -14,7 +15,10 @@ const createTicket = async (ticketData) => {
     `${API_URL}/tickets`,
     ticketData,
     {
-      headers: getHeaders()
+      headers: {
+        ...getHeaders(),
+        "Content-Type": "multipart/form-data"
+      }
     }
   );
 
@@ -43,12 +47,18 @@ const getTicketDetails = async (id) => {
   return response.data;
 };
 
-const addMessage = async (id, message) => {
+const addMessage = async (
+  id,
+  messageData
+) => {
   const response = await axios.post(
     `${API_URL}/tickets/${id}/messages`,
-    { message },
+    messageData,
     {
-      headers: getHeaders()
+      headers: {
+        ...getHeaders(),
+        "Content-Type": "multipart/form-data"
+      }
     }
   );
 

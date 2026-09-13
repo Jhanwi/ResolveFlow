@@ -1,5 +1,9 @@
 const pool = require("../config/db");
 
+const {
+  createNotification
+} = require("../services/notificationService");
+
 const getDashboard = async (req, res) => {
   try {
     const totalResult = await pool.query(
@@ -18,64 +22,104 @@ const getDashboard = async (req, res) => {
        WHERE status = 'resolved'`
     );
 
-    const agentResult = await pool.query(
-      `SELECT COUNT(*)
-       FROM users
-       WHERE role = 'agent'`
-    );
-
-    const customerResult = await pool.query(
-      `SELECT COUNT(*)
-       FROM users
-       WHERE role = 'customer'`
-    );
-
     const slaResult = await pool.query(
       `SELECT
         COUNT(*) AS total,
         COUNT(*) FILTER (
-          WHERE status = 'resolved'
-          AND updated_at <= resolution_due_at
+          WHERE
+            (response_due_at IS NULL OR response_due_at >= CURRENT_TIMESTAMP)
+            AND
+            (resolution_due_at IS NULL OR resolution_due_at >= CURRENT_TIMESTAMP)
         ) AS within_sla
+       FROM tickets`
+    );
+
+    const categoryResult = await pool.query(
+      `SELECT
+        COALESCE(category, 'Uncategorized') AS category,
+        COUNT(*) AS count
        FROM tickets
-       WHERE status = 'resolved'
-       AND resolution_due_at IS NOT NULL`
+       GROUP BY category
+       ORDER BY count DESC`
     );
 
-    const totalTickets = Number(
-      totalResult.rows[0].count
+    const priorityResult = await pool.query(
+      `SELECT
+        priority,
+        COUNT(*) AS count
+       FROM tickets
+       GROUP BY priority
+       ORDER BY count DESC`
     );
 
-    const resolvedTickets = Number(
-      resolvedResult.rows[0].count
+    const volumeResult = await pool.query(
+      `SELECT
+        DATE(created_at) AS date,
+        COUNT(*) AS count
+       FROM tickets
+       WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+       GROUP BY DATE(created_at)
+       ORDER BY date`
     );
 
-    const withinSla = Number(
-      slaResult.rows[0].within_sla
+    const recentResult = await pool.query(
+      `SELECT
+        t.id,
+        t.subject,
+        t.priority,
+        t.status,
+        t.created_at,
+        customer.name AS customer_name,
+        agent.name AS agent_name
+       FROM tickets t
+       JOIN users customer
+         ON t.customer_id = customer.id
+       LEFT JOIN users agent
+         ON t.assigned_agent_id = agent.id
+       ORDER BY t.created_at DESC
+       LIMIT 10`
     );
+
+    const totalTickets =
+      Number(totalResult.rows[0].count);
+
+    const withinSla =
+      Number(slaResult.rows[0].within_sla);
 
     const slaCompliance =
-      resolvedTickets > 0
-        ? Number(
-            ((withinSla / resolvedTickets) * 100).toFixed(2)
+      totalTickets > 0
+        ? Math.round(
+            (withinSla / totalTickets) * 100
           )
         : 0;
 
     res.json({
       stats: {
         totalTickets,
-        openTickets: Number(openResult.rows[0].count),
-        resolvedTickets,
-        agents: Number(agentResult.rows[0].count),
-        customers: Number(customerResult.rows[0].count),
+        openTickets:
+          Number(openResult.rows[0].count),
+        resolvedTickets:
+          Number(resolvedResult.rows[0].count),
         slaCompliance
-      }
+      },
+
+      categoryData:
+        categoryResult.rows,
+
+      priorityData:
+        priorityResult.rows,
+
+      volumeData:
+        volumeResult.rows,
+
+      recentTickets:
+        recentResult.rows
     });
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
-      message: "Unable to fetch dashboard data"
+      message: "Unable to load admin dashboard"
     });
   }
 };
@@ -83,25 +127,23 @@ const getDashboard = async (req, res) => {
 const getAllTickets = async (req, res) => {
   try {
     const {
-      search,
-      status,
-      priority,
-      agentId
+      search = "",
+      status = "",
+      priority = "",
+      agentId = ""
     } = req.query;
 
     const values = [];
     const conditions = [];
 
-    if (search) {
-      values.push(`%${search}%`);
+    if (search.trim()) {
+      values.push(`%${search.trim()}%`);
 
-      conditions.push(`
-        (
-          t.subject ILIKE $${values.length}
+      conditions.push(
+        `(t.subject ILIKE $${values.length}
           OR customer.name ILIKE $${values.length}
-          OR customer.email ILIKE $${values.length}
-        )
-      `);
+          OR customer.email ILIKE $${values.length})`
+      );
     }
 
     if (status) {
@@ -137,7 +179,6 @@ const getAllTickets = async (req, res) => {
       `SELECT
         t.id,
         t.subject,
-        t.description,
         t.category,
         t.priority,
         t.status,
@@ -149,7 +190,8 @@ const getAllTickets = async (req, res) => {
         customer.name AS customer_name,
         customer.email AS customer_email,
         agent.id AS agent_id,
-        agent.name AS agent_name
+        agent.name AS agent_name,
+        agent.email AS agent_email
        FROM tickets t
        JOIN users customer
          ON t.customer_id = customer.id
@@ -176,49 +218,16 @@ const getAgents = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
-        u.id,
-        u.name,
-        u.email,
-        u.created_at,
-        COUNT(t.id) AS assigned_tickets,
-        COUNT(t.id) FILTER (
-          WHERE t.status = 'resolved'
-        ) AS resolved_tickets
-       FROM users u
-       LEFT JOIN tickets t
-         ON u.id = t.assigned_agent_id
-       WHERE u.role = 'agent'
-       GROUP BY u.id
-       ORDER BY u.name`
+        id,
+        name,
+        email
+       FROM users
+       WHERE role = 'agent'
+       ORDER BY name ASC`
     );
 
-    const agents = result.rows.map((agent) => {
-      const assignedTickets =
-        Number(agent.assigned_tickets);
-
-      const resolvedTickets =
-        Number(agent.resolved_tickets);
-
-      const resolutionRate =
-        assignedTickets > 0
-          ? Number(
-              (
-                (resolvedTickets / assignedTickets) *
-                100
-              ).toFixed(2)
-            )
-          : 0;
-
-      return {
-        ...agent,
-        assigned_tickets: assignedTickets,
-        resolved_tickets: resolvedTickets,
-        resolution_rate: resolutionRate
-      };
-    });
-
     res.json({
-      agents
+      agents: result.rows
     });
   } catch (error) {
     console.error(error);
@@ -233,42 +242,117 @@ const getCustomers = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
-        u.id,
-        u.name,
-        u.email,
-        u.created_at,
-        COUNT(t.id) AS ticket_count,
-        COUNT(t.id) FILTER (
-          WHERE t.status = 'resolved'
-        ) AS resolved_tickets,
-        COUNT(t.id) FILTER (
-          WHERE t.status != 'resolved'
-        ) AS open_tickets
-       FROM users u
-       LEFT JOIN tickets t
-         ON u.id = t.customer_id
-       WHERE u.role = 'customer'
-       GROUP BY u.id
-       ORDER BY u.created_at DESC`
+        id,
+        name,
+        email,
+        created_at
+       FROM users
+       WHERE role = 'customer'
+       ORDER BY created_at DESC`
     );
 
     res.json({
-      customers: result.rows.map((customer) => ({
-        ...customer,
-        ticket_count: Number(customer.ticket_count),
-        resolved_tickets: Number(
-          customer.resolved_tickets
-        ),
-        open_tickets: Number(
-          customer.open_tickets
-        )
-      }))
+      customers: result.rows
     });
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
       message: "Unable to fetch customers"
+    });
+  }
+};
+
+const assignTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { agentId } = req.body;
+
+    if (!agentId) {
+      return res.status(400).json({
+        message: "Agent ID is required"
+      });
+    }
+
+    const agentResult = await pool.query(
+      `SELECT
+        id,
+        name,
+        email
+       FROM users
+       WHERE id = $1
+       AND role = 'agent'`,
+      [agentId]
+    );
+
+    if (agentResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Agent not found"
+      });
+    }
+
+    const ticketResult = await pool.query(
+      `SELECT
+        id,
+        subject,
+        customer_id,
+        assigned_agent_id,
+        status
+       FROM tickets
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (ticketResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Ticket not found"
+      });
+    }
+
+    const ticket =
+      ticketResult.rows[0];
+
+    const agent =
+      agentResult.rows[0];
+
+    const result = await pool.query(
+      `UPDATE tickets
+       SET
+         assigned_agent_id = $1,
+         status = CASE
+           WHEN status = 'resolved'
+           THEN status
+           ELSE 'assigned'
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING *`,
+      [
+        agentId,
+        id
+      ]
+    );
+
+    await createNotification(
+      agent.id,
+      `Ticket #${id} has been assigned to you: ${ticket.subject}`,
+      Number(id)
+    );
+
+    res.json({
+      message: "Ticket assigned successfully",
+      ticket: result.rows[0],
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        email: agent.email
+      }
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Unable to assign ticket"
     });
   }
 };
@@ -283,30 +367,23 @@ const getSlaBreaches = async (req, res) => {
         t.status,
         t.response_due_at,
         t.resolution_due_at,
-        t.created_at,
         customer.name AS customer_name,
-        customer.email AS customer_email,
         agent.name AS agent_name
        FROM tickets t
        JOIN users customer
          ON t.customer_id = customer.id
        LEFT JOIN users agent
          ON t.assigned_agent_id = agent.id
-       WHERE
-        (
-          t.status != 'resolved'
-          AND t.resolution_due_at < CURRENT_TIMESTAMP
-        )
-        OR
-        (
-          t.status = 'resolved'
-          AND t.updated_at > t.resolution_due_at
-        )
-       ORDER BY t.resolution_due_at ASC`
+       WHERE t.status != 'resolved'
+       AND (
+         t.response_due_at < CURRENT_TIMESTAMP
+         OR t.resolution_due_at < CURRENT_TIMESTAMP
+       )
+       ORDER BY t.created_at ASC`
     );
 
     res.json({
-      breaches: result.rows
+      tickets: result.rows
     });
   } catch (error) {
     console.error(error);
@@ -317,10 +394,148 @@ const getSlaBreaches = async (req, res) => {
   }
 };
 
+const getSlaPolicies = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+        id,
+        priority,
+        response_minutes,
+        resolution_minutes
+       FROM sla_policies
+       ORDER BY
+         CASE priority
+           WHEN 'critical' THEN 1
+           WHEN 'high' THEN 2
+           WHEN 'medium' THEN 3
+           WHEN 'low' THEN 4
+         END`
+    );
+
+    res.json({
+      policies: result.rows
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Unable to fetch SLA policies"
+    });
+  }
+};
+
+const createSlaPolicy = async (req, res) => {
+  try {
+    const {
+      priority,
+      responseMinutes,
+      resolutionMinutes
+    } = req.body;
+
+    if (
+      !priority ||
+      !responseMinutes ||
+      !resolutionMinutes
+    ) {
+      return res.status(400).json({
+        message:
+          "Priority, response time and resolution time are required"
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO sla_policies
+       (
+         priority,
+         response_minutes,
+         resolution_minutes
+       )
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [
+        priority,
+        responseMinutes,
+        resolutionMinutes
+      ]
+    );
+
+    res.status(201).json({
+      message: "SLA policy created",
+      policy: result.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Unable to create SLA policy"
+    });
+  }
+};
+
+const updateSlaPolicy = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      priority,
+      responseMinutes,
+      resolutionMinutes
+    } = req.body;
+
+    if (
+      !priority ||
+      !responseMinutes ||
+      !resolutionMinutes
+    ) {
+      return res.status(400).json({
+        message:
+          "Priority, response time and resolution time are required"
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE sla_policies
+       SET
+         priority = $1,
+         response_minutes = $2,
+         resolution_minutes = $3
+       WHERE id = $4
+       RETURNING *`,
+      [
+        priority,
+        responseMinutes,
+        resolutionMinutes,
+        id
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "SLA policy not found"
+      });
+    }
+
+    res.json({
+      message: "SLA policy updated",
+      policy: result.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Unable to update SLA policy"
+    });
+  }
+};
+
 module.exports = {
   getDashboard,
   getAllTickets,
   getAgents,
   getCustomers,
-  getSlaBreaches
+  assignTicket,
+  getSlaBreaches,
+  getSlaPolicies,
+  createSlaPolicy,
+  updateSlaPolicy
 };

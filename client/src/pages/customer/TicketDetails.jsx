@@ -23,6 +23,8 @@ const TicketDetails = () => {
   const [messages, setMessages] = useState([]);
 
   const [message, setMessage] = useState("");
+  const [attachment, setAttachment] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
@@ -33,12 +35,17 @@ const TicketDetails = () => {
   const [reviewMessage, setReviewMessage] =
     useState("");
 
+  const [error, setError] = useState("");
+
   useEffect(() => {
     loadTicket();
   }, [id]);
 
   const loadTicket = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getTicketDetails(id);
 
       setTicket(data.ticket);
@@ -50,31 +57,112 @@ const TicketDetails = () => {
       setReview(reviewData.review);
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to load ticket"
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+
+    if (!file) {
+      setAttachment(null);
+      return;
+    }
+
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "application/pdf"
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError(
+        "Only PNG, JPG, JPEG and PDF files are allowed"
+      );
+
+      event.target.value = "";
+      setAttachment(null);
+
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        "File size must be 5 MB or less"
+      );
+
+      event.target.value = "";
+      setAttachment(null);
+
+      return;
+    }
+
+    setError("");
+    setAttachment(file);
+  };
+
   const handleSendMessage = async (event) => {
     event.preventDefault();
 
-    if (!message.trim()) {
+    if (!message.trim() && !attachment) {
+      setError(
+        "Message or attachment is required"
+      );
+
       return;
     }
 
     try {
       setSending(true);
+      setError("");
+
+      const formData = new FormData();
+
+      if (message.trim()) {
+        formData.append(
+          "message",
+          message.trim()
+        );
+      }
+
+      if (attachment) {
+        formData.append(
+          "attachment",
+          attachment
+        );
+      }
 
       await addMessage(
         id,
-        message.trim()
+        formData
       );
 
       setMessage("");
+      setAttachment(null);
+
+      const fileInput =
+        document.getElementById(
+          "customer-attachment"
+        );
+
+      if (fileInput) {
+        fileInput.value = "";
+      }
 
       await loadTicket();
     } catch (error) {
       console.error(error);
+
+      setError(
+        error.response?.data?.message ||
+          "Unable to send message"
+      );
     } finally {
       setSending(false);
     }
@@ -110,6 +198,19 @@ const TicketDetails = () => {
     }
   };
 
+  const getAttachmentName = (
+    attachmentUrl
+  ) => {
+    if (!attachmentUrl) {
+      return "";
+    }
+
+    const parts =
+      attachmentUrl.split("/");
+
+    return parts[parts.length - 1];
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -122,11 +223,15 @@ const TicketDetails = () => {
     return (
       <div className="page">
         <div className="empty-state">
-          <p>Ticket not found.</p>
+          <p>
+            {error || "Ticket not found."}
+          </p>
 
           <button
             className="secondary-button"
-            onClick={() => navigate("/tickets")}
+            onClick={() =>
+              navigate("/tickets")
+            }
           >
             Back to My Tickets
           </button>
@@ -141,7 +246,9 @@ const TicketDetails = () => {
         <div>
           <button
             className="secondary-button"
-            onClick={() => navigate("/tickets")}
+            onClick={() =>
+              navigate("/tickets")
+            }
           >
             ← Back to My Tickets
           </button>
@@ -159,9 +266,17 @@ const TicketDetails = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="form-message error">
+          {error}
+        </div>
+      )}
+
       <div className="ticket-header">
         <div>
-          <h2>{ticket.subject}</h2>
+          <h2>
+            {ticket.subject}
+          </h2>
 
           <p>
             {ticket.description}
@@ -186,7 +301,9 @@ const TicketDetails = () => {
           </span>
 
           <SlaTimer
-            dueAt={ticket.response_due_at}
+            dueAt={
+              ticket.response_due_at
+            }
           />
         </div>
 
@@ -275,11 +392,13 @@ const TicketDetails = () => {
       <div className="conversation-card">
         <div className="section-header">
           <div>
-            <h2>Conversation</h2>
+            <h2>
+              Conversation
+            </h2>
 
             <p>
-              Communicate with the support team
-              about your issue.
+              Communicate with the support
+              team about your issue.
             </p>
           </div>
         </div>
@@ -294,7 +413,8 @@ const TicketDetails = () => {
               <div
                 key={item.id}
                 className={`message ${
-                  item.sender_role === "customer"
+                  item.sender_role ===
+                  "customer"
                     ? "customer-message"
                     : "agent-message"
                 }`}
@@ -317,13 +437,15 @@ const TicketDetails = () => {
 
                 {item.attachment_url && (
                   <a
-                    href={
-                      item.attachment_url
-                    }
+                    href={`http://localhost:5000${item.attachment_url}`}
                     target="_blank"
                     rel="noreferrer"
+                    className="attachment-link"
                   >
-                    View attachment
+                    📎{" "}
+                    {getAttachmentName(
+                      item.attachment_url
+                    )}
                   </a>
                 )}
               </div>
@@ -339,12 +461,42 @@ const TicketDetails = () => {
             <textarea
               value={message}
               onChange={(event) =>
-                setMessage(event.target.value)
+                setMessage(
+                  event.target.value
+                )
               }
               placeholder="Write a reply..."
               rows="4"
               disabled={sending}
             />
+
+            <div className="attachment-input">
+              <label htmlFor="customer-attachment">
+                Attach file
+              </label>
+
+              <input
+                id="customer-attachment"
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf"
+                onChange={
+                  handleFileChange
+                }
+                disabled={sending}
+              />
+
+              <small>
+                PNG, JPG, JPEG or PDF.
+                Maximum 5 MB.
+              </small>
+
+              {attachment && (
+                <small>
+                  Selected:{" "}
+                  {attachment.name}
+                </small>
+              )}
+            </div>
 
             <button
               type="submit"
@@ -367,7 +519,9 @@ const TicketDetails = () => {
 
       {ticket.status === "resolved" && (
         <div className="review-card">
-          <h2>How did we do?</h2>
+          <h2>
+            How did we do?
+          </h2>
 
           {review ? (
             <div className="review-submitted">
@@ -381,7 +535,8 @@ const TicketDetails = () => {
                     <span
                       key={star}
                       className={
-                        star <= review.rating
+                        star <=
+                        review.rating
                           ? "star active"
                           : "star"
                       }
@@ -407,11 +562,14 @@ const TicketDetails = () => {
           ) : (
             <form
               className="review-form"
-              onSubmit={handleReviewSubmit}
+              onSubmit={
+                handleReviewSubmit
+              }
             >
               <p>
-                Did this support interaction
-                solve your problem?
+                Did this support
+                interaction solve your
+                problem?
               </p>
 
               <div className="review-stars">
